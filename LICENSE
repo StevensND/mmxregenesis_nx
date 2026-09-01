@@ -1,0 +1,35 @@
+The MIT License (MIT)
+
+Copyright (C) 2021 Andy Nguyen, fgsfds
+Copyright (C) 2025 delson (delsonazevedo) and the smwr_nx / Godot-4 Switch
+  wrapper contributors
+Copyright (C) 2026 mmxregenesis_nx contributors
+
+This project is a retarget of delson's Godot-4 Switch wrapper (smwr_nx), which
+builds on the SoLoader lineage by Andy Nguyen (TheFloW), fgsfds and
+Rinnegatamante. It loads, but does not include or modify, Godot Engine
+(© the Godot Engine contributors, MIT). Those files retain their upstream
+copyright notices.
+
+This project contains NO game code or assets. Mega Man X Regenesis is a free fan
+game by mmxregenesis (https://mmxregenesis.itch.io/mega-man-x-regenesis); Mega
+Man X and its characters are the property of Capcom. Neither is covered by this
+license. Obtain the game from its official page and supply its files yourself.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

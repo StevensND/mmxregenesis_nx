@@ -1,0 +1,100 @@
+name: Build mmxregenesis_nx.nro
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version. Leave it empty to avoid publishing a release.'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+      options: --user root
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # zlib/expat are runtime deps of the Mesa SDK's static libs.
+      # Use `-S` (NOT `-Sy`): `-Sy` re-syncs the package DB from pkg.devkitpro.org,
+      # which intermittently 403s from Actions. `-S` uses the DB already baked into
+      # the container image and only downloads the packages. Light retry in case a
+      # package download itself blips.
+      - name: Install portlibs
+        run: |
+          for i in 1 2 3; do
+            dkp-pacman -S --noconfirm --needed switch-zlib switch-libexpat && exit 0
+            echo "::warning::portlib install failed (attempt $i/3), retrying in $((i*15))s..."
+            sleep $((i * 15))
+          done
+          exit 1
+
+      # NVK (Nouveau Vulkan) is a custom Mesa build, not in the standard portlibs.
+      # Cached across runs; fetched from a private URL on a cache miss.
+      - name: Restore Mesa SDK
+        id: mesa_sdk
+        uses: actions/cache/restore@v4
+        with:
+          path: mesa-sdk
+          key: mesa-sdk-v1
+
+      - name: Fetch Mesa SDK on cache miss
+        if: steps.mesa_sdk.outputs.cache-hit != 'true'
+        env:
+          URL: ${{ secrets.MESA_SDK_URL }}
+          AUTH: ${{ secrets.MESA_SDK_AUTH }}
+        run: |
+          if [ -z "$URL" ]; then echo "::error::MESA_SDK_URL secret not set."; exit 1; fi
+          apt-get update -qq && apt-get install -y -qq curl unzip
+          if [ -n "$AUTH" ]; then curl -fL -H "$AUTH" -o mesa-sdk.zip "$URL"; else curl -fL -o mesa-sdk.zip "$URL"; fi
+          mkdir -p mesa-sdk && unzip -q mesa-sdk.zip -d mesa-sdk
+
+      - name: Save Mesa SDK
+        if: steps.mesa_sdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: mesa-sdk
+          key: mesa-sdk-v1
+
+      - name: Build
+        run: make -j$(nproc)
+        env:
+          DEVKITPRO: /opt/devkitpro
+          DEVKITA64: /opt/devkitpro/devkitA64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmxregenesis_nx
+          path: mmxregenesis_nx.nro
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mmxregenesis_nx
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ inputs.version }}"
+          name: "mmxregenesis_nx v${{ inputs.version }}"
+          files: mmxregenesis_nx.nro
+          draft: false
+          prerelease: false

@@ -1,0 +1,15 @@
+/release
+/build
+/.tmp
+/tools
+/reference
+/mesa-build
+/mesa-install
+*elf
+*lst
+*nacp
+*nro
+*apk
+# ignore stray shell scripts EXCEPT the Mesa build script we ship
+*.sh
+!scripts/build-mesa.sh
