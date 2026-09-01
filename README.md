@@ -122,11 +122,11 @@ It's also recommended to apply OC for better performance.
 
 **Env Particles + Light OFF**
 
-https://github.com/user-attachments/assets/d0cf1878-93fa-4faf-b915-c30c7e426623
+https://github.com/user-attachments/assets/ec6a1f13-1b81-4e52-9121-45de5fd9a3d9
 
 **Env Particles + Light ON**
 
-https://github.com/user-attachments/assets/75869234-e5a8-465c-8471-5d014360d929
+https://github.com/user-attachments/assets/a2378b7d-ac0e-46e4-9bee-d450055f21f5
 
 ## Build
 
