@@ -86,10 +86,11 @@ These are the defaults — the buttons are **remappable from the game's own Inpu
 Settings menu**, so you can set them to your taste in-game.
 
 > [!NOTE]
-> Since 1.00.8 the game has its own on-screen touch controls. They stay hidden
-> while a controller is connected, but the game still draws their small, faint
-> on/off toggle at the top center of the screen (it treats the port as a mobile
-> device) — that's expected.
+> The game's on-screen touch controls (added in 1.00.8) start **off** on Switch, at
+> 0% transparency, and their "TC" on/off button at the top of the screen stays
+> hidden while they're off — the wrapper patches those defaults into the game's
+> scripts at boot. To use them, turn them on in Options → Controls → Touch Controls
+> and raise the transparency. A touch setting you already saved is kept.
 
 ## Configuration
 

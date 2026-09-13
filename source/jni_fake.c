@@ -270,15 +270,13 @@ static const char *resolve_gd_path(int access_type, const char *p, char *buf, si
     const char *s = sandbox_path(p, buf, sz);
     if (s != buf) snprintf(buf, sz, "%s", s);
   }
-  // Redirect any ACTIVE override shader to our _ovr copy. Godot reads shader
-  // CONTENT through this handler, so the redirect has to happen here or the
-  // override never takes effect. shader_override_realpath() (godot_shim.c) picks
-  // the active set (the compatibility text shaders).
+  // Redirect any ACTIVE override to our _ovr copy. Godot reads file CONTENT
+  // through this handler (found with the shaders), so the redirect has to happen
+  // here or the override never takes effect. asset_override_path() (godot_shim.c)
+  // picks the active set: the compatibility text shaders and patched scripts.
   // The "/assets/" guard keeps us from re-redirecting the _ovr file itself.
-  if (strstr(buf, "/assets/")) {
-    const char *ov = shader_override_realpath(buf);
-    if (ov) snprintf(buf, sz, "%s", ov);
-  }
+  if (strstr(buf, "/assets/"))
+    asset_override_path(buf, buf, sz);
   // strip trailing slashes (fatfs stat dislikes them)
   size_t l = strlen(buf);
   while (l > 1 && buf[l - 1] == '/') buf[--l] = 0;

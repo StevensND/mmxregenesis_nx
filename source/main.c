@@ -29,6 +29,7 @@
 #include "godot_shim.h"
 #include "hotfix.h"
 #include "asset_pack.h"
+#include "script_patch.h"
 
 static void *heap_so_base = NULL;
 static size_t heap_so_limit = 0;
@@ -990,6 +991,11 @@ int main(void) {
       }
     }
   }
+
+  // Touch-control defaults patched into the game's scripts (script_patch.c). Needs
+  // the engine's zstd, so it runs after the init arrays -- and after the pack, so a
+  // script can also be read from it.
+  script_patches_apply();
 
   // the game sees cwd="/" (getcwd_fake) and stray absolute writes are rebased
   // into save_root (sandbox_path); move the REAL cwd there too so any genuine
