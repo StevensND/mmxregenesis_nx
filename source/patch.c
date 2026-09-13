@@ -1,6 +1,7 @@
 /* patch.c -- game-specific patches for libgodot_android.so (Mega Man X
- * Regenesis, Godot 4.7 arm64-v8a). Offsets were derived from the v1.00.61 APK
- * and re-verified byte-identical in v1.00.7; they are validated against the
+ * Regenesis, Godot 4.7 arm64-v8a). Offsets were derived from the v1.00.61 APK;
+ * the engine binary is byte-identical in 1.00.7, 1.00.8 and 1.00.91 (md5
+ * 5515d98fff588d6c2f8d20e64cd85a3a). They are validated against the
  * original instruction bytes before patching (a mismatch is logged and
  * skipped, never applied blind).
  *
@@ -60,7 +61,7 @@ static int can_capture_pointer_safe(void *self) {
 // off keeps the GPU alive; sprites render fine, just unlit. This was once removed
 // as "dead code" (menu point-lights are unaffected and stay visible, so it LOOKED
 // inert) and it brought the freeze back -- do not remove it. Word is verified
-// before patching, and the 1.00.7 engine binary is byte-identical to 1.00.61.
+// before patching, and the engine binary is the same in every version checked (see top).
 #define CANVAS_LIGHT_ENABLED_VADDR 0x321f290
 #define CANVAS_LIGHT_ENABLED_ORIG  0x33000049u  /* bfxil w9, w2, #0, #1 */
 #define CANVAS_LIGHT_ENABLED_REPL  0x330003e9u  /* bfc   w9, #0, #1      */

@@ -437,16 +437,23 @@ typedef struct {
 // (GL_INVALID_VALUE in glUniform1i) -> garbled menu text. We can't ship the
 // game's assets (copyright) and don't want users hand-editing files, so we
 // transparently serve these compatibility shaders whenever the engine opens
-// those two res:// paths. They render the MSDF font flat but legible and keep
-// each label's modulate color. This is our own shader source, not the game's.
+// those two res:// paths. They draw each glyph flat but legible and keep each
+// label's modulate color. This is our own shader source, not the game's.
+//
+// Glyph coverage is min(median(rgb), alpha), right for both kinds of font atlas:
+// MSDF (distance in rgb) and plain LumAlpha8, which Vulkan samples as (L,L,L,A)
+// with L=1 -- there the rgb median alone is 1 over the whole glyph quad and the
+// text turns into solid blocks. 1.00.91's fonts (the main pixel font and the
+// CJK/JP/RU/Intl fallbacks) are all LumAlpha8, none is MSDF. If the driver
+// ignores the swizzle, alpha reads 1 and this is the previous median-only formula.
 // ---------------------------------------------------------------------------
 static const char OVR_TEXT_STYLE[] =
   "shader_type canvas_item;\n"
   "render_mode blend_premul_alpha;\n"
   "float msdf_median(vec3 c){return max(min(c.r,c.g),min(max(c.r,c.g),c.b));}\n"
   "void fragment(){\n"
-  "  vec3 m=texture(TEXTURE,UV).rgb;\n"
-  "  float d=msdf_median(m);\n"
+  "  vec4 t=texture(TEXTURE,UV);\n"
+  "  float d=min(msdf_median(t.rgb),t.a);\n"
   "  float w=fwidth(d);\n"
   "  float cov=smoothstep(0.5-w,0.5+w,d);\n"
   "  float a=cov*COLOR.a;\n"
@@ -461,8 +468,8 @@ static const char OVR_TEXT_SELECTED[] =
   "uniform float select_shimmer_speed = 2.0;\n"
   "float msdf_median(vec3 c){return max(min(c.r,c.g),min(max(c.r,c.g),c.b));}\n"
   "void fragment(){\n"
-  "  vec3 m=texture(TEXTURE,UV).rgb;\n"
-  "  float d=msdf_median(m);\n"
+  "  vec4 t=texture(TEXTURE,UV);\n"
+  "  float d=min(msdf_median(t.rgb),t.a);\n"
   "  float w=fwidth(d);\n"
   "  float cov=smoothstep(0.5-w,0.5+w,d);\n"
   "  vec3 rgb=COLOR.rgb;\n"
@@ -473,7 +480,7 @@ static const char OVR_TEXT_SELECTED[] =
   "}\n"
   "// nx-pad";  // trailing comment w/o newline: absorbs a stray over-read byte
 
-// The two MSDF text shaders that break on nouveau (5 samplers) are replaced by
+// The two text shaders that break on nouveau (5 samplers) are replaced by
 // our own 1-sampler compatibility shaders. We WRITE them to real files under
 // <save_root>/_ovr at startup and redirect reads there, rather than serving the
 // source from memory: Godot reads shader CONTENT through the JNI FileAccessHandler
@@ -484,7 +491,7 @@ static int is_override_shader(const char *base) {
   // These MUST stay overridden on BOTH renderers. On GL Compatibility the game's
   // shaders hit a 5-sampler glUniform1i limit; on Vulkan/NVK they ray-march each
   // glyph in a loop that idle-times-out the GPU channel (type=8, device lost).
-  // Our 1-sampler MSDF replacement renders flat-but-legible text with neither.
+  // Our 1-sampler replacement renders flat-but-legible text with neither.
   if (!strcmp(base, "text_style.gdshader") ||
       !strcmp(base, "text_selected_fx.gdshader"))
     return 1;

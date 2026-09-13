@@ -33,7 +33,8 @@
 extern int screen_width;
 extern int screen_height;
 
-// locale reported to the engine via GodotIO.getLocale (the game is English)
+// locale reported to the engine via GodotIO.getLocale. The game doesn't follow it:
+// it starts in English and keeps its own choice in user://MMXLanguageSettings.json.
 #define DEVICE_LOCALE "en_US"
 
 typedef struct {

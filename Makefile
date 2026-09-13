@@ -13,7 +13,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 TARGET		:=	mmxregenesis_nx
 APP_TITLE	:=	Mega Man X Regenesis
 APP_AUTHOR	:=	StevensND
-APP_VERSION	:=	1.0.0
+APP_VERSION	:=	1.00.91
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data

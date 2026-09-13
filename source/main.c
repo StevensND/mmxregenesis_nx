@@ -1,4 +1,4 @@
-/* main.c -- Mega Man X Regenesis v1.00.61 (Godot 4.7, Android) Switch
+/* main.c -- Mega Man X Regenesis v1.00.91 (Godot 4.7, Android) Switch
  * wrapper entry point.
  *
  * Loads the arm64-v8a libc++_shared.so + libgodot_android.so pair, provides a
@@ -611,6 +611,9 @@ static void game_thread_fn(void *arg) {
   // teardown -> whole engine hangs, black screen). override.cfg turns it off. res://
   // is the assets dir (read via AAsset with a loose-file fallback), so the file goes
   // there; a copy at data_root covers the game.pck path too.
+  // vsync_mode=3 is only what the engine starts with: since 1.00.9 the game applies
+  // its own V-Sync option at boot (DisplayServer.window_set_vsync_mode, saved in
+  // user://MMXWindowSettings.json), and NVK on Switch presents FIFO either way.
   if (s_use_vulkan) {
     const char *ovr_body =
       "; Written by the wrapper: this console has no Android Choreographer, so\n"
@@ -882,7 +885,7 @@ int main(void) {
     snprintf(cache, sizeof(cache), "%s/shader_cache", config.save_root);
     mkdir(cache, 0777);
   }
-  write_shader_overrides(); // stage our compat MSDF text shaders under <save_root>/_ovr
+  write_shader_overrides(); // stage our compat text shaders under <save_root>/_ovr
   setenv("HOME", config.save_root, 1);
 
   // GPU driver tuning, set BEFORE the GL driver comes up in egl_setup().

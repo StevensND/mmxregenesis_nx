@@ -336,19 +336,74 @@ int asset_pack_open_existing(const char *root) {
   return 1;
 }
 
-// Returns 1 if the pack should be (re)built: either it's missing, or the source
-// assets are newer than it. project.binary is rewritten on every game update, and
-// freshly-copied assets carry a newer mtime than the previously-built pack, so a
-// game update rebuilds the pack automatically instead of serving stale content
-// from the old one. Returns 0 when the pack is present and at least as new.
+// Returns 1 when <assets_root>/<relative> no longer matches the copy stored in
+// the pack (different size or bytes, or not packed at all). A loose file that
+// doesn't exist has nothing to compare against and counts as unchanged.
+static int packed_copy_differs(int pack_fd, const DiskEntry *entries, const char *paths,
+                               size_t count, const char *assets_root, const char *relative) {
+  char loose_path[1024];
+  snprintf(loose_path, sizeof loose_path, "%s/%s", assets_root, relative);
+  struct stat st;
+  if (stat(loose_path, &st) != 0) return 0;
+
+  const DiskEntry *entry = NULL;
+  size_t low = 0, high = count;
+  while (low < high && !entry) {
+    size_t mid = low + (high - low) / 2;
+    int cmp = strcmp(relative, paths + entries[mid].path_offset);
+    if (cmp == 0) entry = &entries[mid];
+    else if (cmp < 0) high = mid;
+    else low = mid + 1;
+  }
+  if (!entry || entry->size != (uint64_t)st.st_size) return 1;
+
+  int differs = 1;
+  int loose_fd = open(loose_path, O_RDONLY);
+  unsigned char *packed = malloc(PACK_CACHE_SIZE), *loose = malloc(PACK_CACHE_SIZE);
+  if (loose_fd >= 0 && packed && loose) {
+    differs = 0;
+    for (uint64_t done = 0; done < entry->size && !differs;) {
+      size_t chunk = entry->size - done > PACK_CACHE_SIZE ? PACK_CACHE_SIZE
+                                                          : (size_t)(entry->size - done);
+      differs = !read_at(pack_fd, packed, chunk, entry->offset + done) ||
+                !read_at(loose_fd, loose, chunk, done) || memcmp(packed, loose, chunk) != 0;
+      done += chunk;
+    }
+  }
+  free(packed);
+  free(loose);
+  if (loose_fd >= 0) close(loose_fd);
+  return differs;
+}
+
+// Returns 1 if the pack should be (re)built: it's missing or unreadable, or the
+// assets changed since it was built. project.binary is rewritten on every game
+// update and freshly-copied assets usually carry a newer mtime than the pack --
+// but not always: 7-Zip keeps the APK's own timestamps, so an update copied off a
+// PC can look OLDER than a pack built after that APK was published, and the old
+// pack would keep serving the previous version. So when the mtimes don't flag it,
+// also compare the packed copies of the files every Godot export rewrites
+// (project.binary, and assets.sparsepck, which lists every asset with its md5)
+// against the loose ones. Returns 0 when the pack is present and matches.
 int asset_pack_stale(const char *assets_root, const char *root) {
-  char pack_path[768], src_path[768];
+  char pack_path[768], index_path[768], src_path[768];
   snprintf(pack_path, sizeof pack_path, "%s/assets.nxpack", root);
+  snprintf(index_path, sizeof index_path, "%s/assets.nxidx", root);
   snprintf(src_path, sizeof src_path, "%s/project.binary", assets_root);
   struct stat ps, ss;
   if (stat(pack_path, &ps) != 0) return 1;   // no pack yet -> build
   if (stat(src_path, &ss) != 0) return 0;    // no source to compare -> keep the pack
-  return ss.st_mtime > ps.st_mtime;          // assets updated after the pack was built
+  if (ss.st_mtime > ps.st_mtime) return 1;   // assets updated after the pack was built
+
+  DiskEntry *entries = NULL;
+  char *paths = NULL;
+  size_t count = 0;
+  int pack_fd = -1;
+  if (!load_pair(pack_path, index_path, &entries, &paths, &count, &pack_fd)) return 1;
+  int stale = packed_copy_differs(pack_fd, entries, paths, count, assets_root, "project.binary") ||
+              packed_copy_differs(pack_fd, entries, paths, count, assets_root, "assets.sparsepck");
+  free_loaded(entries, paths, pack_fd);
+  return stale;
 }
 
 int asset_pack_active(void) {

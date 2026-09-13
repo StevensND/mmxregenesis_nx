@@ -17,9 +17,10 @@ NVK (Nouveau Vulkan / Mesa) driver.
 > [!NOTE]
 > Mega Man X Regenesis is a **free** fan game — get it from their
 > [official itch.io page](https://mmxregenesis.itch.io/mega-man-x-regenesis). This
-> port targets the **Android build (game version 1.00.7)**; the ABI is tied to the
-> Godot engine build, so a future game version that ships a newer engine may need
-> re-checking (a content-only update like this one just works).
+> port targets the **Android build (game version 1.00.91)**. Its engine binary
+> (`libgodot_android.so`) is byte-identical to the one in 1.00.61, 1.00.7 and 1.00.8,
+> so the loader's patches still apply; a future game version that ships a newer
+> engine may need re-checking.
 
 > [!WARNING]
 > You might find the same bugs/issues happening on PC/Android. 
@@ -62,14 +63,15 @@ Finally **CHECK [THIS SCREENSHOT](https://i.imgur.com/W4hpDcY.jpeg)** to know wh
 
 > [!NOTE]
 > **Updating the game:** when a new game version comes out, just replace the
-> `assets/` folder with the new one. The wrapper notices the assets are newer than
-> its pack and rebuilds it automatically on the next launch — no need to delete
-> anything by hand.
+> `assets/` folder with the new one. On the next launch the wrapper notices the
+> assets changed (by date, or by content if the extractor kept the APK's older
+> timestamps) and rebuilds its pack automatically, so that launch takes longer —
+> no need to delete anything by hand.
 
 ## Controls
 
-The full Switch controller is handed to the game. Input is gamepad-only — the
-touchscreen and gyro are not used.
+The full Switch controller is handed to the game, and the touchscreen is passed
+through as a single touch (the gyro is not used).
 
 | Input | Action |
 | --- | --- |
@@ -82,6 +84,12 @@ touchscreen and gyro are not used.
 
 These are the defaults — the buttons are **remappable from the game's own Input
 Settings menu**, so you can set them to your taste in-game.
+
+> [!NOTE]
+> Since 1.00.8 the game has its own on-screen touch controls. They stay hidden
+> while a controller is connected, but the game still draws their small, faint
+> on/off toggle at the top center of the screen (it treats the port as a mobile
+> device) — that's expected.
 
 ## Configuration
 
@@ -127,6 +135,20 @@ https://github.com/user-attachments/assets/ec6a1f13-1b81-4e52-9121-45de5fd9a3d9
 **Env Particles + Light ON**
 
 https://github.com/user-attachments/assets/a2378b7d-ac0e-46e4-9bee-d450055f21f5
+
+## In-game video options
+
+Versions 1.00.9 and 1.00.91 added several Video options meant for PC and Android.
+On Switch they behave like this:
+
+| Option | On Switch |
+| --- | --- |
+| Renderer | Not shown — the game hides it on mobile builds. The port always renders with Vulkan. |
+| V-Sync | No effect: the Switch's Vulkan driver only presents with FIFO v-sync. |
+| Max FPS | Works. 60 matches the display. |
+| Fullscreen | No effect: the port always runs full screen. |
+| Screen filter | CRT / Smooth draw a full-screen shader over the image, which costs GPU time. Leave it on None for the best framerate. |
+| Display FPS / Display inputs | Work. |
 
 ## Build
 

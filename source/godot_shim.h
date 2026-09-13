@@ -82,7 +82,7 @@ int      iswxdigit_l_fake(int c, void *loc);
 // --- AAssetManager over <data_root>/assets/ ---
 void    *AAssetManager_fromJava_fake(void *env, void *assetManager);
 void    *AAssetManager_open_fake(void *mgr, const char *filename, int mode);
-void     write_shader_overrides(void); // stage compat MSDF text shaders to <save_root>/_ovr
+void     write_shader_overrides(void); // stage compat text shaders to <save_root>/_ovr
 const char *shader_override_realpath(const char *filename); // _ovr path if it's an override shader, else NULL
 int      AAsset_read_fake(void *asset, void *buf, size_t count);
 int64_t  AAsset_seek_fake(void *asset, int64_t offset, int whence);
