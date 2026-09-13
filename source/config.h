@@ -25,7 +25,7 @@
 // nxlink stdout, and all debugPrintf/[io]/[audio] output. Set to 1 to diagnose
 // on hardware; 0 for release (no log/stats files written, and faster: no
 // per-line fflush to the SD card).
-#define DEBUG_LOG 0
+#define DEBUG_LOG 1
 // Per-file-operation logging (open/stat/access/fopen). Very noisy and slow
 // (one fflush per line during asset loading); requires DEBUG_LOG too.
 #define VERBOSE_IO 0

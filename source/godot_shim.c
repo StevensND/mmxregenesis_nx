@@ -538,8 +538,8 @@ int asset_override_path(const char *filename, char *out, size_t size) {
   return 1;
 }
 
-// Writes <save_root>/_ovr/<base>; returns 1 when the file on disk has the expected
-// size. Some FAT/SD stacks ignore O_TRUNC on "wb" AND ftruncate, so writing a
+// Writes <save_root>/_ovr/<base>; returns 1 when the file reads back exactly as
+// `data`. Some FAT/SD stacks ignore O_TRUNC on "wb" AND ftruncate, so writing a
 // shorter file straight over a longer stale one from an earlier build left a
 // garbage tail -- for a shader, a stray char on the line after it -> "Expected
 // constant" parse error. Write a fresh temp, then remove+rename over the target:
@@ -564,18 +564,24 @@ static int write_override_file(const char *base, const void *data, size_t n) {
       remove(tmp);
     }
   } else debugPrintf("[ovr] WARN could not write override %s\n", tmp);
-  // Verify: a size mismatch means a stale tail slipped through (SD didn't honour
-  // the remove/rename) -- surface it so it's obvious in the log.
-  long got = -1;
+  // Verify by reading it back: a mismatch means a stale tail slipped through (SD
+  // didn't honour the remove/rename) or the write failed -- surface it in the log.
+  int matches = 0;
   FILE *v = fopen(p, "rb");
   if (v) {
-    fseek(v, 0, SEEK_END);
-    got = ftell(v);
+    unsigned char chunk[4096];
+    size_t off = 0, got;
+    matches = 1;
+    while (matches && (got = fread(chunk, 1, sizeof(chunk), v)) > 0) {
+      matches = off + got <= n && !memcmp(chunk, (const unsigned char *)data + off, got);
+      off += got;
+    }
     fclose(v);
-    if (got != (long)n)
-      debugPrintf("[ovr] WARN %s is %ld bytes on disk, expected %zu (stale tail!)\n", base, got, n);
+    if (off != n) matches = 0;
+    if (!matches)
+      debugPrintf("[ovr] WARN %s on disk doesn't match what was written (stale tail?)\n", base);
   }
-  return got == (long)n;
+  return matches;
 }
 
 // Write the compatibility shaders to <save_root>/_ovr at startup. Called from

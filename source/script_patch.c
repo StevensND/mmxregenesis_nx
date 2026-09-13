@@ -233,6 +233,7 @@ static uint8_t *patch_script(const uint8_t *file, size_t file_len, const ScriptP
   if (raw_len > MAX_TOKEN_BUFFER) return NULL;
 
   int ok = 0;
+  uint8_t *check = NULL;
   uint8_t *out = malloc(file_len);
   uint8_t *raw = raw_len ? malloc(raw_len) : NULL;
   if (!out || (raw_len && !raw)) goto done;
@@ -262,8 +263,18 @@ static uint8_t *patch_script(const uint8_t *file, size_t file_len, const ScriptP
       ok = 1;
     }
   }
+  // A .gdc the engine can't decode crashes the game at boot: GDScript::reload reports
+  // a failed parse through the parser's first error, and a buffer that doesn't decode
+  // records none. So only hand over a copy that the engine's own zstd decodes back to
+  // exactly the patched tokens.
+  if (ok) {
+    check = malloc(raw_len);
+    ok = check && ZSTD_decompress(check, raw_len, out + GDSC_HEADER_SIZE, stored) == raw_len &&
+         !memcmp(check, raw, raw_len);
+  }
 
 done:
+  free(check);
   free(raw);
   if (!ok) {
     free(out);
