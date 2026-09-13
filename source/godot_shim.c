@@ -511,69 +511,92 @@ static const char *override_src_for(const char *base) {
   return OVR_PASSTHROUGH; // defensive default; is_override_shader only serves the two above
 }
 
-// Returns a pointer to a static path "<save_root>/_ovr/<basename>" if `filename`
-// is one of our override shaders, else NULL. Caller must use/copy it before the
-// next call (single-threaded asset loading, so this is safe here).
-// Is this file one we serve an override copy for? Only the compatibility text
-// shaders (per is_override_shader).
+// Is this file one we serve a copy of from <save_root>/_ovr? The compatibility
+// text shaders always; a game script only once script_patch.c has written its
+// patched copy this boot (a copy left over from an earlier boot is never served).
+#define MAX_SCRIPT_OVERRIDES 4
+static char s_script_overrides[MAX_SCRIPT_OVERRIDES][64];
+static int s_script_override_count;
+
 static int is_override_file(const char *base) {
-  return is_override_shader(base);
+  if (is_override_shader(base)) return 1;
+  for (int i = 0; i < s_script_override_count; i++)
+    if (!strcmp(base, s_script_overrides[i])) return 1;
+  return 0;
 }
 
-const char *shader_override_realpath(const char *filename) {
+// If `filename` (a relative asset path, or an absolute .../assets/... one) is served
+// from _ovr, writes "<save_root>/_ovr/<basename>" to `out` and returns 1.
+int asset_override_path(const char *filename, char *out, size_t size) {
   const char *base = strrchr(filename, '/');
   base = base ? base + 1 : filename;
-  if (!is_override_file(base)) return NULL;
-  static char p[768];
-  snprintf(p, sizeof(p), "%s/_ovr/%s", config.save_root, base);
-  return p;
+  if (!is_override_file(base)) return 0;
+  snprintf(out, size, "%s/_ovr/%s", config.save_root, base);
+  return 1;
+}
+
+// Writes <save_root>/_ovr/<base>; returns 1 when the file on disk has the expected
+// size. Some FAT/SD stacks ignore O_TRUNC on "wb" AND ftruncate, so writing a
+// shorter file straight over a longer stale one from an earlier build left a
+// garbage tail -- for a shader, a stray char on the line after it -> "Expected
+// constant" parse error. Write a fresh temp, then remove+rename over the target:
+// the target is created new from the temp, so no old tail survives.
+static int write_override_file(const char *base, const void *data, size_t n) {
+  char dir[600], p[768], tmp[800];
+  snprintf(dir, sizeof(dir), "%s/_ovr", config.save_root);
+  mkdir(dir, 0777);
+  snprintf(p, sizeof(p), "%s/%s", dir, base);
+  snprintf(tmp, sizeof(tmp), "%s.tmp", p);
+  remove(tmp);
+  FILE *f = fopen(tmp, "wb");
+  if (f) {
+    fwrite(data, 1, n, f);
+    fflush(f);
+    fclose(f);
+    remove(p);
+    if (rename(tmp, p) != 0) {          // fallback: direct truncating write
+      FILE *g = fopen(p, "wb");
+      if (g) { fwrite(data, 1, n, g); fflush(g);
+               if (ftruncate(fileno(g), (off_t)n) != 0) { /* best-effort */ } fclose(g); }
+      remove(tmp);
+    }
+  } else debugPrintf("[ovr] WARN could not write override %s\n", tmp);
+  // Verify: a size mismatch means a stale tail slipped through (SD didn't honour
+  // the remove/rename) -- surface it so it's obvious in the log.
+  long got = -1;
+  FILE *v = fopen(p, "rb");
+  if (v) {
+    fseek(v, 0, SEEK_END);
+    got = ftell(v);
+    fclose(v);
+    if (got != (long)n)
+      debugPrintf("[ovr] WARN %s is %ld bytes on disk, expected %zu (stale tail!)\n", base, got, n);
+  }
+  return got == (long)n;
 }
 
 // Write the compatibility shaders to <save_root>/_ovr at startup. Called from
 // main() once save_root is known, before the game loads any scene.
 void write_shader_overrides(void) {
-  char dir[600];
-  snprintf(dir, sizeof(dir), "%s/_ovr", config.save_root);
-  mkdir(dir, 0777);
-  // The compatibility text shaders we override (is_override_shader gates them).
   const char *names[2] = {
     "text_style.gdshader", "text_selected_fx.gdshader",
   };
   for (int i = 0; i < 2; i++) {
-    if (!is_override_shader(names[i])) continue;
     const char *src = override_src_for(names[i]);
-    size_t n = strlen(src);
-    char p[768], tmp[800];
-    snprintf(p, sizeof(p), "%s/%s", dir, names[i]);
-    snprintf(tmp, sizeof(tmp), "%s.tmp", p);
-    // Some FAT/SD stacks ignore O_TRUNC on "wb" AND ftruncate, so writing a
-    // shorter shader straight over a longer stale file from an earlier build left
-    // a garbage tail -- a stray char on the line after the shader -> "Expected
-    // constant" parse error. Write a fresh temp, then remove+rename over the
-    // target: the target is created new from the temp, so no old tail survives.
-    remove(tmp);
-    FILE *f = fopen(tmp, "wb");
-    if (f) {
-      fwrite(src, 1, n, f);
-      fflush(f);
-      fclose(f);
-      remove(p);
-      if (rename(tmp, p) != 0) {          // fallback: direct truncating write
-        FILE *g = fopen(p, "wb");
-        if (g) { fwrite(src, 1, n, g); fflush(g);
-                 if (ftruncate(fileno(g), (off_t)n) != 0) { /* best-effort */ } fclose(g); }
-        remove(tmp);
-      }
-    } else debugPrintf("[shader] WARN could not write override %s\n", tmp);
-    // Verify: a size mismatch means a stale tail slipped through (SD didn't honour
-    // the remove/rename) -- surface it so it's obvious in the log.
-    { FILE *v = fopen(p, "rb");
-      if (v) { fseek(v, 0, SEEK_END); long got = ftell(v); fclose(v);
-        if (got != (long)n)
-          debugPrintf("[shader] WARN %s is %ld bytes on disk, expected %zu (stale tail!)\n",
-                      names[i], got, n); } }
+    write_override_file(names[i], src, strlen(src));
   }
-  debugPrintf("[shader] compat text overrides written to %s\n", dir);
+  debugPrintf("[shader] compat text overrides written to %s/_ovr\n", config.save_root);
+}
+
+// Writes a patched game script to _ovr and starts serving it (script_patch.c).
+int script_override_write(const char *base, const void *data, size_t len) {
+  if (s_script_override_count >= MAX_SCRIPT_OVERRIDES ||
+      strlen(base) >= sizeof(s_script_overrides[0]))
+    return 0;
+  if (!write_override_file(base, data, len)) return 0;
+  snprintf(s_script_overrides[s_script_override_count], sizeof(s_script_overrides[0]), "%s", base);
+  s_script_override_count++;
+  return 1;
 }
 
 static void *g_fake_assetmgr = (void *)0xA55E7;
@@ -594,13 +617,11 @@ void *AAssetManager_open_fake(void *mgr, const char *filename, int mode) {
   if (!filename) return NULL;
   while (*filename == '/') filename++;
 
-  // transparent compatibility-shader substitution: open OUR override file
-  // (written to <save_root>/_ovr at startup) instead of the game's shader.
+  // transparent substitution: open OUR copy (written to <save_root>/_ovr at startup)
+  // instead of the game's file -- the compatibility text shaders and patched scripts.
   char path[768];
-  const char *ovrpath = shader_override_realpath(filename);
-  if (ovrpath) {
-    snprintf(path, sizeof(path), "%s", ovrpath);
-    debugPrintf("[shader] serving compat override for %s\n", filename);
+  if (asset_override_path(filename, path, sizeof(path))) {
+    debugPrintf("[ovr] serving override for %s\n", filename);
   } else {
     snprintf(path, sizeof(path), "%s/assets/%s", config.data_root, filename);
     // Fast path: serve the game's own assets from the on-device asset pack (one
