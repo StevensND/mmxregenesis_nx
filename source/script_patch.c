@@ -2,14 +2,19 @@
  * defaults that only exist in script code (the touch-control settings).
  *
  * Each target .gdc is read from the user's own assets, decompressed with the
- * engine's zstd (the ZSTD_decompress forwarder in main.c), patched by rewriting
- * literal constants in its token buffer, and written to <save_root>/_ovr as an
- * uncompressed .gdc that godot_shim.c serves instead of the original. Nothing is
- * patched blind: the whole buffer has to parse, and each constant has to hold the
- * expected value with the expected number of uses -- otherwise that script is left
- * alone and the game runs its original code. A game version that changes these
- * scripts may need the tables below re-derived. No game code is shipped here, only
- * the literals to look for.
+ * engine's zstd (the ZSTD_* forwarders in main.c), patched by rewriting literal
+ * constants in its token buffer, re-encoded and written to <save_root>/_ovr, which
+ * godot_shim.c serves instead of the original. Nothing is patched blind: the whole
+ * buffer has to parse, and each constant has to hold the expected value with the
+ * expected number of uses -- otherwise that script is left alone and the game runs
+ * its original code. A game version that changes these scripts may need the tables
+ * below re-derived. No game code is shipped here, only the literals to look for.
+ *
+ * The copy must be exactly as long as the original: the engine reads every file
+ * listed in assets.sparsepck with the size recorded there, so a longer copy would be
+ * cut short and a shorter one padded with whatever is in memory. A compressed script
+ * is re-compressed at a higher level than Godot's export (level 3), and the spare
+ * bytes become a zstd skippable frame, which the decompressor steps over.
  *
  * .gdc layout (Godot 4.5+, tokenizer version 101): "GDSC", u32 version, u32
  * decompressed size (0 = stored uncompressed), then the token buffer: u32 counts of
@@ -33,9 +38,14 @@
 
 // the engine's zstd, forwarded by main.c
 size_t ZSTD_decompress(void *dst, size_t dstCap, const void *src, size_t srcSize);
+size_t ZSTD_compress(void *dst, size_t dstCap, const void *src, size_t srcSize, int level);
 
 #define GDSC_HEADER_SIZE 12
+#define MAX_TOKEN_BUFFER (16u << 20)
 #define TOKEN_LITERAL 3 // GDScriptTokenizer::Token::LITERAL
+
+#define ZSTD_SKIPPABLE_MAGIC 0x184D2A50u
+#define ZSTD_SKIPPABLE_HEADER_SIZE 8
 
 // Variant::Type ids of GDScript literals, and the 64-bit payload flag
 #define VARIANT_NIL 0
@@ -87,6 +97,13 @@ static const ScriptPatch k_scripts[] = {
 
 static uint32_t read_u32(const uint8_t *p) {
   return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+static void write_u32(uint8_t *p, uint32_t v) {
+  p[0] = (uint8_t)v;
+  p[1] = (uint8_t)(v >> 8);
+  p[2] = (uint8_t)(v >> 16);
+  p[3] = (uint8_t)(v >> 24);
 }
 
 // Encoded size of one constant, for the Variant types GDScript literals use; 0 for
@@ -208,31 +225,50 @@ done:
   return ok;
 }
 
-// Returns the patched script as an uncompressed .gdc (caller frees), or NULL.
-static uint8_t *patch_script(const uint8_t *file, size_t file_len, const ScriptPatch *script,
-                             size_t *out_len) {
+// Returns the patched script, exactly `file_len` bytes long (caller frees), or NULL.
+static uint8_t *patch_script(const uint8_t *file, size_t file_len, const ScriptPatch *script) {
   if (file_len < GDSC_HEADER_SIZE || memcmp(file, "GDSC", 4)) return NULL;
   const size_t stored = file_len - GDSC_HEADER_SIZE;
-  const size_t raw = read_u32(file + 8);
-  const size_t tokens_len = raw ? raw : stored;
-  uint8_t *out = malloc(GDSC_HEADER_SIZE + tokens_len);
-  if (!out) return NULL;
-  uint8_t *tokens = out + GDSC_HEADER_SIZE;
-  if (raw) {
-    if (ZSTD_decompress(tokens, raw, file + GDSC_HEADER_SIZE, stored) != raw) {
-      free(out);
-      return NULL;
-    }
-  } else {
-    memcpy(tokens, file + GDSC_HEADER_SIZE, stored);
+  const size_t raw_len = read_u32(file + 8); // 0 = stored uncompressed
+  if (raw_len > MAX_TOKEN_BUFFER) return NULL;
+
+  int ok = 0;
+  uint8_t *out = malloc(file_len);
+  uint8_t *raw = raw_len ? malloc(raw_len) : NULL;
+  if (!out || (raw_len && !raw)) goto done;
+  memcpy(out, file, GDSC_HEADER_SIZE);
+
+  if (!raw_len) { // uncompressed: the patch keeps the size, rewrite in place
+    memcpy(out + GDSC_HEADER_SIZE, file + GDSC_HEADER_SIZE, stored);
+    ok = patch_token_buffer(out + GDSC_HEADER_SIZE, stored, script->patches, script->count);
+    goto done;
   }
-  if (!patch_token_buffer(tokens, tokens_len, script->patches, script->count)) {
+
+  if (ZSTD_decompress(raw, raw_len, file + GDSC_HEADER_SIZE, stored) != raw_len ||
+      !patch_token_buffer(raw, raw_len, script->patches, script->count))
+    goto done;
+  static const int levels[] = { 19, 12, 6 };
+  for (unsigned i = 0; i < sizeof(levels) / sizeof(*levels) && !ok; i++) {
+    const size_t packed = ZSTD_compress(out + GDSC_HEADER_SIZE, stored, raw, raw_len, levels[i]);
+    if (packed > stored) continue; // error code, e.g. it didn't fit
+    const size_t gap = stored - packed;
+    if (gap == 0) {
+      ok = 1;
+    } else if (gap >= ZSTD_SKIPPABLE_HEADER_SIZE) {
+      uint8_t *pad = out + GDSC_HEADER_SIZE + packed;
+      write_u32(pad, ZSTD_SKIPPABLE_MAGIC);
+      write_u32(pad + 4, (uint32_t)(gap - ZSTD_SKIPPABLE_HEADER_SIZE));
+      memset(pad + ZSTD_SKIPPABLE_HEADER_SIZE, 0, gap - ZSTD_SKIPPABLE_HEADER_SIZE);
+      ok = 1;
+    }
+  }
+
+done:
+  free(raw);
+  if (!ok) {
     free(out);
     return NULL;
   }
-  memcpy(out, file, 8);  // "GDSC" + tokenizer version
-  memset(out + 8, 0, 4); // decompressed size 0: stored uncompressed
-  *out_len = GDSC_HEADER_SIZE + tokens_len;
   return out;
 }
 
@@ -259,14 +295,14 @@ void script_patches_apply(void) {
     const ScriptPatch *script = &k_scripts[i];
     char path[512];
     snprintf(path, sizeof(path), "%s/assets/%s", config.data_root, script->asset);
-    size_t file_len = 0, out_len = 0;
+    size_t file_len = 0;
     uint8_t *file = read_file(path, &file_len);
     if (!file && asset_pack_active()) {
       void *packed = NULL;
       if (asset_pack_read_all_path(path, &packed, &file_len)) file = packed;
     }
-    uint8_t *out = file ? patch_script(file, file_len, script, &out_len) : NULL;
-    if (out && script_override_write(script->name, out, out_len))
+    uint8_t *out = file ? patch_script(file, file_len, script) : NULL;
+    if (out && script_override_write(script->name, out, file_len))
       debugPrintf("[script] %s patched\n", script->asset);
     else
       debugPrintf("[script] %s left unpatched (%s)\n", script->asset,

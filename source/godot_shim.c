@@ -526,10 +526,13 @@ static int is_override_file(const char *base) {
 }
 
 // If `filename` (a relative asset path, or an absolute .../assets/... one) is served
-// from _ovr, writes "<save_root>/_ovr/<basename>" to `out` and returns 1.
+// from _ovr, writes "<save_root>/_ovr/<basename>" to `out` and returns 1. `out` may be
+// `filename` itself: the basename is copied first.
 int asset_override_path(const char *filename, char *out, size_t size) {
-  const char *base = strrchr(filename, '/');
-  base = base ? base + 1 : filename;
+  const char *slash = strrchr(filename, '/');
+  char base[64];
+  if (snprintf(base, sizeof(base), "%s", slash ? slash + 1 : filename) >= (int)sizeof(base))
+    return 0; // longer than any file we override
   if (!is_override_file(base)) return 0;
   snprintf(out, size, "%s/_ovr/%s", config.save_root, base);
   return 1;

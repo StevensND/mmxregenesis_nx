@@ -275,9 +275,8 @@ static const char *resolve_gd_path(int access_type, const char *p, char *buf, si
   // here or the override never takes effect. asset_override_path() (godot_shim.c)
   // picks the active set: the compatibility text shaders and patched scripts.
   // The "/assets/" guard keeps us from re-redirecting the _ovr file itself.
-  char ov[768];
-  if (strstr(buf, "/assets/") && asset_override_path(buf, ov, sizeof(ov)))
-    snprintf(buf, sz, "%s", ov);
+  if (strstr(buf, "/assets/"))
+    asset_override_path(buf, buf, sz);
   // strip trailing slashes (fatfs stat dislikes them)
   size_t l = strlen(buf);
   while (l > 1 && buf[l - 1] == '/') buf[--l] = 0;
