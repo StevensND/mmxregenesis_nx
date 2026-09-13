@@ -459,7 +459,7 @@ static const char OVR_TEXT_STYLE[] =
   "  float a=cov*COLOR.a;\n"
   "  COLOR=vec4(COLOR.rgb*a,a);\n"
   "}\n"
-  "// nx-pad";  // trailing comment w/o newline: absorbs a stray byte if the loader over-reads by one
+  "// nx-pad";  // trailing comment w/o newline: holds the padding spaces (write_shader_overrides)
 
 static const char OVR_TEXT_SELECTED[] =
   "shader_type canvas_item;\n"
@@ -478,7 +478,7 @@ static const char OVR_TEXT_SELECTED[] =
   "  float a=cov*COLOR.a;\n"
   "  COLOR=vec4(rgb*a,a);\n"
   "}\n"
-  "// nx-pad";  // trailing comment w/o newline: absorbs a stray over-read byte
+  "// nx-pad";  // trailing comment w/o newline: holds the padding spaces (write_shader_overrides)
 
 // The two text shaders that break on nouveau (5 samplers) are replaced by
 // our own 1-sampler compatibility shaders. We WRITE them to real files under
@@ -586,13 +586,38 @@ static int write_override_file(const char *base, const void *data, size_t n) {
 
 // Write the compatibility shaders to <save_root>/_ovr at startup. Called from
 // main() once save_root is known, before the game loads any scene.
+//
+// Each copy is padded with spaces to the size of the game's own shader: the engine
+// reads every file listed in assets.sparsepck with the size recorded there, so a
+// shorter copy came back with the rest of the buffer uninitialized. The "// nx-pad"
+// comment only hides that garbage up to its first newline; past one, some boots
+// failed with "Cannot parse shader" (text_selected_fx.gdshader on 1.00.91, taking
+// input_menu.scn and pause_menu.gd down with it). The spaces stay inside that
+// trailing comment. With no original to measure, the copy is written unpadded.
 void write_shader_overrides(void) {
   const char *names[2] = {
     "text_style.gdshader", "text_selected_fx.gdshader",
   };
   for (int i = 0; i < 2; i++) {
     const char *src = override_src_for(names[i]);
-    write_override_file(names[i], src, strlen(src));
+    const size_t len = strlen(src);
+    char original[768];
+    struct stat st;
+    snprintf(original, sizeof(original), "%s/assets/shaders/%s", config.data_root, names[i]);
+    size_t size = len;
+    if (stat(original, &st) == 0 && st.st_size > (off_t)len) size = (size_t)st.st_size;
+    char *padded = size > len ? malloc(size) : NULL;
+    size_t served = len;
+    if (padded) {
+      memcpy(padded, src, len);
+      memset(padded + len, ' ', size - len);
+      write_override_file(names[i], padded, size);
+      free(padded);
+      served = size;
+    } else {
+      write_override_file(names[i], src, len);
+    }
+    debugPrintf("[shader] %s: %zu bytes of source, served as %zu\n", names[i], len, served);
   }
   debugPrintf("[shader] compat text overrides written to %s/_ovr\n", config.save_root);
 }
