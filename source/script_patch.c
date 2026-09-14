@@ -83,9 +83,9 @@ static const ConstPatch k_touch_controls[] = {
   { NULL, NULL, 0.1764706, 0.0, 1 },
 };
 
-// save_load.gd _load_touch_settings(): overlay_opacity = clamp(saved, 0.1, 1.0), while
-// the Touch Controls menu goes down to 0% -- so a saved 0% came back as 10% on the next
-// boot. Lower bound 0.1 -> 0.0.
+// save_load.gd _load_touch_settings(): overlay_opacity = clamp(saved, 0.1, 1.0), so the
+// 0% default above came back as 10% once the settings had been saved. Lower bound
+// 0.1 -> 0.0. (Since 1.00.92 the Touch Controls menu itself stops at 10%.)
 static const ConstPatch k_save_load[] = {
   { NULL, NULL, 0.1, 0.0, 1 },
 };

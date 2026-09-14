@@ -1,6 +1,6 @@
 /* patch.c -- game-specific patches for libgodot_android.so (Mega Man X
  * Regenesis, Godot 4.7 arm64-v8a). Offsets were derived from the v1.00.61 APK;
- * the engine binary is byte-identical in 1.00.7, 1.00.8 and 1.00.91 (md5
+ * the engine binary is byte-identical in 1.00.7, 1.00.8, 1.00.91 and 1.00.92 (md5
  * 5515d98fff588d6c2f8d20e64cd85a3a). They are validated against the
  * original instruction bytes before patching (a mismatch is logged and
  * skipped, never applied blind).

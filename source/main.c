@@ -1,4 +1,4 @@
-/* main.c -- Mega Man X Regenesis v1.00.91 (Godot 4.7, Android) Switch
+/* main.c -- Mega Man X Regenesis v1.00.92 (Godot 4.7, Android) Switch
  * wrapper entry point.
  *
  * Loads the arm64-v8a libc++_shared.so + libgodot_android.so pair, provides a

@@ -17,8 +17,8 @@ NVK (Nouveau Vulkan / Mesa) driver.
 > [!NOTE]
 > Mega Man X Regenesis is a **free** fan game — get it from their
 > [official itch.io page](https://mmxregenesis.itch.io/mega-man-x-regenesis). This
-> port targets the **Android build (game version 1.00.91)**. Its engine binary
-> (`libgodot_android.so`) is byte-identical to the one in 1.00.61, 1.00.7 and 1.00.8,
+> port targets the **Android build (game version 1.00.92)**. Its engine binary
+> (`libgodot_android.so`) is byte-identical to the one in 1.00.61, 1.00.7, 1.00.8 and 1.00.91,
 > so the loader's patches still apply; a future game version that ships a newer
 > engine may need re-checking.
 

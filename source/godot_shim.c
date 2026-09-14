@@ -443,7 +443,7 @@ typedef struct {
 // Glyph coverage is min(median(rgb), alpha), right for both kinds of font atlas:
 // MSDF (distance in rgb) and plain LumAlpha8, which Vulkan samples as (L,L,L,A)
 // with L=1 -- there the rgb median alone is 1 over the whole glyph quad and the
-// text turns into solid blocks. 1.00.91's fonts (the main pixel font and the
+// text turns into solid blocks. The 1.00.91/1.00.92 fonts (the main pixel font and the
 // CJK/JP/RU/Intl fallbacks) are all LumAlpha8, none is MSDF. If the driver
 // ignores the swizzle, alpha reads 1 and this is the previous median-only formula.
 // ---------------------------------------------------------------------------
