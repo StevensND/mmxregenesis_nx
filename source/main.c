@@ -856,6 +856,25 @@ static void watchdog_dump(void) {
   }
 }
 
+// Does the loaded engine actually have a Vulkan backend? A custom Godot build can be
+// compiled without one: 1.01.0's engine is GL-Compatibility-only (38 MB against the
+// 71 MB 4.7.stable.official build that served 1.00.61-1.00.92, and with no
+// vkCreateInstance, no VK_KHR_surface and no RenderingDeviceDriverVulkan anywhere in
+// it). vulkan_shim_probe() only reports that OUR Vulkan (NVK) came up -- it cannot
+// know what the engine supports -- and handing "--rendering-driver vulkan" to a build
+// without one makes Main::setup fail outright, before a single frame. Godot reaches
+// Vulkan by dlopen()ing libvulkan.so.1, so that string sits in the engine image
+// exactly when there is a Vulkan backend to drive. Call after so_load (the image is
+// populated and still readable) and before the renderer is committed to.
+static int engine_has_vulkan(const so_module *mod) {
+  static const char needle[] = "libvulkan.so.1";
+  const char *base = (const char *)mod->load_base;
+  if (!base || mod->load_size < sizeof(needle)) return 0;
+  for (size_t i = 0, span = mod->load_size - (sizeof(needle) - 1); i < span; i++)
+    if (base[i] == needle[0] && !memcmp(base + i, needle, sizeof(needle) - 1)) return 1;
+  return 0;
+}
+
 static void load_module(so_module *mod, const char *name, void *base, size_t limit) {
   int res = so_load(mod, name, base, limit);
   if (res < 0)
@@ -943,6 +962,17 @@ int main(void) {
   load_module(&cxx_mod, CXX_SO_NAME, heap_so_base, CXX_SO_SLICE);
   void *game_base = (char *)heap_so_base + CXX_SO_SLICE;
   load_module(&game_mod, SO_NAME, game_base, heap_so_limit - CXX_SO_SLICE);
+
+  // The renderer was picked from our own Vulkan probe above, before the engine was
+  // loaded. Now that it is, check that it HAS a Vulkan backend and fall back to the
+  // GLES3 context if it does not (see engine_has_vulkan). Nothing between that
+  // decision and here needs the graphics context, so creating it now is safe.
+  if (s_use_vulkan && !engine_has_vulkan(&game_mod)) {
+    debugPrintf("== engine is a GL Compatibility build (no Vulkan) -- using GLES3 ==\n");
+    s_use_vulkan = 0;
+    if (egl_setup() != 0) fatal_error("Could not create the EGL/GLES3 context.");
+    debugPrintf("== EGL/GLES3 context created (%dx%d) ==\n", screen_width, screen_height);
+  }
 
   mmx_resolve_imports(&cxx_mod);
   mmx_resolve_imports(&game_mod);

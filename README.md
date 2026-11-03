@@ -11,8 +11,11 @@ A wrapper/port of the Android release of Mega Man X Regenesis, a free fan game b
 It loads the original engine binaries (`libgodot_android.so`, `libc++_shared.so`),
 resolves their imports against native Switch implementations and patches them so the
 game runs inside a minimal Android environment (fake JNI, a bionic→newlib libc shim,
-audio and input). Rendering goes through Godot's **Vulkan** backend on the Switch's
-NVK (Nouveau Vulkan / Mesa) driver.
+audio and input). Rendering goes through whichever backend the game's engine was
+built with: Godot's **Vulkan** backend on the Switch's NVK (Nouveau Vulkan / Mesa)
+driver, or **GLES3** when the engine has no Vulkan in it. Game version 1.01.0 ships a
+GL-Compatibility-only engine, so that is what it runs on; 1.00.61 through 1.00.92 ran
+on Vulkan. The wrapper detects this at boot — there is nothing to set.
 
 > [!NOTE]
 > Mega Man X Regenesis is a **free** fan game — get it from their
@@ -111,7 +114,7 @@ enable_vulkan 1
 | `screen_width` / `screen_height` | Render resolution (see below). |
 | `deadzone` | Analog-stick dead zone, in percent (`0` disables it). |
 | `assetpack` | `1` folds the loose game files into an indexed on-device pack on first boot for faster SD loading; `0` reads the loose files. |
-| `enable_vulkan` | `1` uses the Vulkan renderer (recommended); `0` forces the GLES3 fallback. |
+| `enable_vulkan` | `1` uses the Vulkan renderer when the engine has one (recommended); `0` forces the GLES3 fallback. An engine built without Vulkan, like 1.01.0's, uses GLES3 either way. |
 
 ## Resolution
 
@@ -119,8 +122,8 @@ Both handheld and docked render at **1280x720** by default. In handheld that is 
 native panel resolution; in docked the Switch compositor upscales the 720p image to
 the 1080p output.
 
-You can lower the render resolution in `config.txt`. The Switch's Vulkan driver is
-limited to FIFO v-sync, so the heaviest scenes can dip to 30 fps at 720p. 
+You can lower the render resolution in `config.txt`. Presentation is limited to FIFO
+v-sync here, so the heaviest scenes can dip to 30 fps at 720p. 
 
 ## Performance
 
@@ -146,8 +149,8 @@ On Switch they behave like this:
 
 | Option | On Switch |
 | --- | --- |
-| Renderer | Not shown — the game hides it on mobile builds. The port always renders with Vulkan. |
-| V-Sync | No effect: the Switch's Vulkan driver only presents with FIFO v-sync. |
+| Renderer | Not shown — the game hides it on mobile builds. The port follows whatever the engine was built with (GLES3 on 1.01.0). |
+| V-Sync | No effect: neither backend presents with anything but FIFO v-sync here. |
 | Max FPS | Works. 60 matches the display. |
 | Fullscreen | No effect: the port always runs full screen. |
 | Screen filter | Every filter draws a full-screen shader over the image, which costs GPU time (1.01.0 adds four more). Leave it on None for the best framerate. |
