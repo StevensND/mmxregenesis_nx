@@ -83,16 +83,13 @@ static const ConstPatch k_touch_controls[] = {
   { NULL, NULL, 0.1764706, 0.0, 1 },
 };
 
-// save_load.gd _load_touch_settings(): overlay_opacity = clamp(saved, 0.1, 1.0), so the
-// 0% default above came back as 10% once the settings had been saved. Lower bound
-// 0.1 -> 0.0. (Since 1.00.92 the Touch Controls menu itself stops at 10%.)
-static const ConstPatch k_save_load[] = {
-  { NULL, NULL, 0.1, 0.0, 1 },
-};
-
+// save_load.gd used to need a patch too: _load_touch_settings() read the saved opacity
+// back as clamp(saved, 0.1, 1.0), so the 0% default above returned as 10% on the next
+// boot. 1.01.0 clamps to (0.0, 1.0) itself -- the game added its own 0% support -- so
+// that patch is gone. If a future version reintroduces a lower bound, the saved value
+// is what comes back, and it needs adding here again.
 static const ScriptPatch k_scripts[] = {
   { "scripts/touch_controls.gdc", "touch_controls.gdc", k_touch_controls, 2 },
-  { "scripts/Functions/save_load.gdc", "save_load.gdc", k_save_load, 1 },
 };
 
 static uint32_t read_u32(const uint8_t *p) {

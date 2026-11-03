@@ -444,8 +444,11 @@ typedef struct {
 // MSDF (distance in rgb) and plain LumAlpha8, which Vulkan samples as (L,L,L,A)
 // with L=1 -- there the rgb median alone is 1 over the whole glyph quad and the
 // text turns into solid blocks. The 1.00.91/1.00.92 fonts (the main pixel font and the
-// CJK/JP/RU/Intl fallbacks) are all LumAlpha8, none is MSDF. If the driver
-// ignores the swizzle, alpha reads 1 and this is the previous median-only formula.
+// CJK/JP/RU/Intl fallbacks) were all LumAlpha8, none MSDF -- which is why the formula
+// stopped being median-only. Taking the min of the two keeps it correct either way, so
+// a font set that changes (1.01.0 adds Arabic and MegamaxJones, drops PixelOperator and
+// mega-man-x2) needs no change here. If the driver ignores the swizzle, alpha reads 1
+// and this is the previous median-only formula.
 // ---------------------------------------------------------------------------
 static const char OVR_TEXT_STYLE[] =
   "shader_type canvas_item;\n"

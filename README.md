@@ -17,10 +17,12 @@ NVK (Nouveau Vulkan / Mesa) driver.
 > [!NOTE]
 > Mega Man X Regenesis is a **free** fan game — get it from their
 > [official itch.io page](https://mmxregenesis.itch.io/mega-man-x-regenesis). This
-> port targets the **Android build (game version 1.00.92)**. Its engine binary
-> (`libgodot_android.so`) is byte-identical to the one in 1.00.61, 1.00.7, 1.00.8 and 1.00.91,
-> so the loader's patches still apply; a future game version that ships a newer
-> engine may need re-checking.
+> port targets the **Android build (game version 1.01.0)**. That version ships a
+> rebuilt engine binary (`libgodot_android.so`), unlike 1.00.61 through 1.00.92 which
+> all shared one. The loader's two instruction patches were re-derived for it, so a
+> **game version other than 1.01.0 is not expected to work with this build** — the
+> patches verify the bytes they expect and skip themselves on a mismatch, which costs
+> you the intro-crash fix and the 2D-lighting GPU-freeze fix.
 
 > [!WARNING]
 > You might find the same bugs/issues happening on PC/Android. 
@@ -89,7 +91,7 @@ Settings menu**, so you can set them to your taste in-game.
 > The game's on-screen touch controls (added in 1.00.8) start **off** on Switch, at
 > 0% transparency, and their "TC" on/off button at the top of the screen stays
 > hidden while they're off — the wrapper patches those defaults into the game's
-> scripts at boot. To use them, turn them on in Options → Controls → Touch Controls
+> script at boot. To use them, turn them on in Options → Controls → Touch Controls
 > and raise the transparency. A touch setting you already saved is kept.
 
 ## Configuration
@@ -139,7 +141,7 @@ https://github.com/user-attachments/assets/a2378b7d-ac0e-46e4-9bee-d450055f21f5
 
 ## In-game video options
 
-Versions 1.00.9 and 1.00.91 added several Video options meant for PC and Android.
+Versions 1.00.9 onwards added several Video options meant for PC and Android.
 On Switch they behave like this:
 
 | Option | On Switch |
@@ -148,7 +150,8 @@ On Switch they behave like this:
 | V-Sync | No effect: the Switch's Vulkan driver only presents with FIFO v-sync. |
 | Max FPS | Works. 60 matches the display. |
 | Fullscreen | No effect: the port always runs full screen. |
-| Screen filter | CRT / Smooth draw a full-screen shader over the image, which costs GPU time. Leave it on None for the best framerate. |
+| Screen filter | Every filter draws a full-screen shader over the image, which costs GPU time (1.01.0 adds four more). Leave it on None for the best framerate. |
+| 4:3 display (1.01.0) | Works — it pillarboxes inside the same 720p output. |
 | Display FPS / Display inputs | Work. |
 
 ## Build
